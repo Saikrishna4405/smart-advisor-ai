@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="d-flex justify-content-center align-items-center animate-fade-in" style="min-height: 70vh;">
+
+    <!-- Rendered via Glassmorphic Tokens -->
+    <div class="glass-card p-5 shadow-lg" style="width: 100%; max-width: 400px;">
+
+        <div class="text-center mb-4">
+            <h2 class="mb-1 text-gradient">Welcome Back</h2>
+            <p class="text-secondary small">Sign in to access your AI portfolio.</p>
+        </div>
+
+        {% if error %}
+            <div class="alert alert-danger" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171;">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST">
+
+            <div class="mb-4 position-relative">
+                <input type="text" name="username" class="form-control" placeholder="Username" required autocomplete="off">
+            </div>
+
+            <div class="mb-4 position-relative">
+                <input type="password" name="password" class="form-control" placeholder="Password" required>
+            </div>
+
+            <button type="submit" class="btn-premium w-100 py-3 mt-2" style="font-size: 1.1rem;">
+                Secure Login →
+            </button>
+
+        </form>
+
+        <div class="text-center mt-4">
+            <p class="text-secondary mb-0">
+                New across the markets?
+                <a href="/signup" class="text-decoration-none fw-bold" style="color: var(--accent-cyan);">Create an Account</a>
+            </p>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

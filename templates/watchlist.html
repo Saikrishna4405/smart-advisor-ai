@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="animate-fade-in" style="max-width: 800px; margin: auto;">
+
+    <div class="d-flex justify-content-between align-items-center mt-4 mb-4 pb-3 border-bottom" style="border-color: var(--glass-border) !important;">
+        <h2 class="mb-0 text-gradient"><span class="me-2">⭐</span> Your Watchlist</h2>
+        
+        {% if watchlist %}
+        <form method="POST" action="/clear_watchlist">
+            <button type="submit" class="btn-outline-glass text-danger border-danger">
+                Clear All
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if not watchlist %}
+        <div class="glass-card p-5 text-center mt-5">
+            <h1 class="display-1 opacity-50 mb-3">🔭</h1>
+            <h4 class="text-secondary">Your watchlist is completely empty.</h4>
+            <p class="text-secondary small">Head over to Stock Analyze to analyze and star prospective equities.</p>
+            <a href="/analyze" class="btn-premium mt-3 text-decoration-none d-inline-block">Go to Analyze</a>
+        </div>
+    {% else %}
+        <div class="row g-3">
+            {% for stock in watchlist %}
+                <div class="col-md-6">
+                    <div class="glass-card glass-card-hover d-flex justify-content-between align-items-center p-3 px-4">
+                        
+                        <div class="d-flex align-items-center gap-3">
+                            <div style="background: rgba(79, 172, 254, 0.1); border-radius: 8px; padding: 10px;">
+                                📈
+                            </div>
+                            <div>
+                                <h5 class="mb-0 fw-bold">{{ stock }}</h5>
+                                <small class="text-secondary">Live Tracker</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <!-- Analyze form -->
+                            <form method="POST" action="/analyze" class="mb-0">
+                                <input type="hidden" name="stock" value="{{ stock }}">
+                                <button type="submit" class="btn btn-sm btn-outline-info" style="border-radius: 20px;">
+                                    Analyze
+                                </button>
+                            </form>
+                            
+                            <!-- Remove form -->
+                            <form method="POST" action="/remove_from_watchlist" class="mb-0">
+                                <input type="hidden" name="stock" value="{{ stock }}">
+                                <button type="submit" class="btn btn-sm text-danger" title="Remove" style="background: rgba(239, 68, 68, 0.1); border-radius: 20px;">
+                                    ✖
+                                </button>
+                            </form>
+                        </div>
+                        
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}

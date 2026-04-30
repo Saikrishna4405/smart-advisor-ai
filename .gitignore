@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Data & Database
+*.db
+# *.csv
+# dataset/
+
+# Server logs
+*.log
+history.txt
+
+# IDE
+.vscode/
+.idea/
+
+# Ignore custom
+investment-mobile/
+Fresh_Deploy.zip

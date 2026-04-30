@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* Dashboard Ticker Animation */
+.ticker-wrap {
+    width: 100%;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--glass-border);
+    white-space: nowrap;
+    padding: 10px 0;
+}
+.ticker {
+    display: inline-block;
+    padding-left: 100%;
+    animation: ticker-animation 30s linear infinite;
+}
+.ticker-item {
+    display: inline-block;
+    padding: 0 30px;
+    font-size: 0.95rem;
+}
+@keyframes ticker-animation {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+.nav-card-compact {
+    padding: 15px !important;
+    min-height: 80px !important;
+}
+</style>
+
+<div class="animate-fade-in">
+    
+    <!-- Live Indices Ticker -->
+    {% if dash_data and dash_data.indices %}
+    <div class="ticker-wrap">
+        <div class="ticker">
+            {% for name, index in dash_data.indices.items() %}
+                <div class="ticker-item">
+                    <span class="text-white opacity-75">{{ name }}</span> 
+                    <span class="fw-bold ms-2">₹{{ "{:,.2f}".format(index.price) }}</span>
+                    <span class="ms-1 fw-bold {% if index.change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if index.change >= 0 %}▲{% else %}▼{% endif %} {{ "{:,.2f}".format(index.change|abs) }}%
+                    </span>
+                </div>
+                <div class="ticker-item opacity-25">♦</div>
+            {% endfor %}
+            <!-- Duplicate for seamless scroll -->
+            {% for name, index in dash_data.indices.items() %}
+                <div class="ticker-item">
+                    <span class="text-white opacity-75">{{ name }}</span> 
+                    <span class="fw-bold ms-2">₹{{ "{:,.2f}".format(index.price) }}</span>
+                    <span class="ms-1 fw-bold {% if index.change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if index.change >= 0 %}▲{% else %}▼{% endif %} {{ "{:,.2f}".format(index.change|abs) }}%
+                    </span>
+                </div>
+                {% if not loop.last %}<div class="ticker-item opacity-25">♦</div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center mt-2 mb-4">
+        <h1 class="display-5 text-gradient mb-2">Market Overview</h1>
+        <p class="text-secondary">Smart insights for Indian stocks.</p>
+    </div>
+
+    <!-- Quick Navigation (Highlighted) -->
+    <div class="row g-3 mb-5">
+        <div class="col-md-3">
+            <a href="/analyze" class="text-decoration-none">
+                <div class="glass-card glass-card-hover nav-card-compact text-center d-flex align-items-center justify-content-center gap-2" style="border: 1px solid var(--accent-cyan); background: rgba(0, 242, 254, 0.05);">
+                    <span class="fs-4">🔍</span>
+                    <h5 class="mb-0 text-white">Analyze</h5>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="/scanner" class="text-decoration-none">
+                <div class="glass-card glass-card-hover nav-card-compact text-center d-flex align-items-center justify-content-center gap-2" style="border: 1px solid var(--accent-purple); background: rgba(79, 172, 254, 0.05);">
+                    <span class="fs-4">⚡</span>
+                    <h5 class="mb-0 text-white">Scanner</h5>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="/watchlist" class="text-decoration-none">
+                <div class="glass-card glass-card-hover nav-card-compact text-center d-flex align-items-center justify-content-center gap-2" style="border: 1px solid #fbbf24; background: rgba(251, 191, 36, 0.05);">
+                    <span class="fs-4">⭐</span>
+                    <h5 class="mb-0 text-white">Watchlist</h5>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="/buy" class="text-decoration-none">
+                <div class="glass-card glass-card-hover nav-card-compact text-center d-flex align-items-center justify-content-center gap-2" style="border: 1px solid #4ade80; background: rgba(74, 222, 128, 0.05);">
+                    <span class="fs-4">💼</span>
+                    <h5 class="mb-0 text-white">Portfolio</h5>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <!-- Market Sentiment & News (Left Col) -->
+        <div class="col-lg-6">
+            <div class="glass-card p-4 h-100" id="sentiment-card">
+                <h4 class="mb-4 d-flex align-items-center gap-2">🧠 Market Mood</h4>
+                
+                <div id="sentiment-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary mb-2" role="status"></div>
+                    <p class="text-secondary small">AI is analyzing news headlines...</p>
+                </div>
+
+                <div id="sentiment-content" style="display: none;">
+                    <div class="text-center mb-4">
+                        <div class="gauge-container mb-3">
+                            <div class="gauge-arc" id="gauge-arc"></div>
+                            <div class="gauge-needle" id="gauge-needle"></div>
+                        </div>
+                        <h2 class="mb-0" id="sentiment-score">-- / 100</h2>
+                        <h5 class="fw-bold opacity-75" id="sentiment-text">Neutral</h5>
+                        <p class="small text-secondary mt-2 px-3" id="sentiment-summary">Crunching latest market data...</p>
+                    </div>
+                </div>
+
+                <hr style="border-color: var(--glass-border);">
+                
+                <h6 class="mb-3 text-white opacity-75 mt-3">📰 Live Headlines</h6>
+                {% if dash_data and dash_data.news %}
+                    <ul class="list-unstyled mb-0 gap-2 d-flex flex-column" style="max-height: 140px; overflow-y: auto; padding-right: 5px;">
+                        {% for n in dash_data.news %}
+                            <li class="small text-secondary" style="font-size: 0.85rem; line-height: 1.4;"><span class="me-2 text-primary">▪</span> {{ n }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="small text-secondary">No recent news fetched.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Top Picks (Right Col) -->
+        <div class="col-lg-6">
+            <div class="glass-card p-4 h-100 d-flex flex-column">
+                <div>
+                    <h4 class="mb-4 d-flex align-items-center gap-2">🔥 Top Picks Today</h4>
+                    <p class="small text-secondary mb-4">Top stocks selected for growth and trend breakouts.</p>
+
+                    <div class="row g-3">
+                        {% if dash_data and dash_data.picks %}
+                            {% for pick in dash_data.picks %}
+                                <div class="col-12">
+                                    <div class="p-3 rounded-4" style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="p-2 bg-primary bg-opacity-10 rounded text-primary">
+                                                    {{ loop.index }}
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-0 fw-bold">{{ pick.stock }}</h6>
+                                                    <span class="badge {% if pick.trend == 'Uptrend' %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 {% if pick.trend == 'Uptrend' %}text-success{% else %}text-danger{% endif %} small" style="font-size: 0.65rem;">
+                                                        {{ pick.trend }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="text-secondary small d-block">RSI</span>
+                                                <span class="fw-bold {% if pick.rsi < 35 %}text-success{% elif pick.rsi > 70 %}text-danger{% endif %}">{{ pick.rsi }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-4">
+                    <a href="/analyze" class="btn btn-outline-glass w-100 rounded-pill">Analyze More Stocks</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sector Analysis Section -->
+    <div class="glass-card p-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0">📊 Sector Performance (Today)</h4>
+            <span class="badge bg-secondary bg-opacity-10 text-secondary">Real-time Feed</span>
+        </div>
+        
+        <div class="row g-3">
+            {% if dash_data and dash_data.sector_heat %}
+                {% for sector in dash_data.sector_heat %}
+                    <div class="col-6 col-md-3">
+                        <div class="p-3 text-center rounded-4 border border-opacity-10 transition-all hover-translate-y" 
+                             style="border-color: {% if sector.change >= 0 %}#4ade80{% else %}#ef4444{% endif %}; 
+                                    background: {% if sector.change >= 0 %}rgba(74, 222, 128, 0.05){% else %}rgba(239, 68, 68, 0.05){% endif %};
+                                    box-shadow: 0 4px 15px {% if sector.change >= 0 %}rgba(74, 222, 128, 0.1){% else %}rgba(239, 68, 68, 0.1){% endif %};">
+                            <p class="small text-secondary mb-1 text-uppercase letter-spacing-1" style="font-size: 0.7rem;">{{ sector.name }}</p>
+                            <h5 class="mb-0 fw-bold {% if sector.change >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {% if sector.change >= 0 %}+{% endif %}{{ sector.change }}%
+                            </h5>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetchSentiment();
+});
+
+async function fetchSentiment() {
+    try {
+        const response = await fetch('/api/dashboard_sentiment');
+        const data = await response.json();
+        
+        if (data.score !== undefined) {
+            document.getElementById('sentiment-loading').style.display = 'none';
+            document.getElementById('sentiment-content').style.display = 'block';
+            
+            const score = parseInt(data.score);
+            let color = "#fbbf24"; // Neutral default
+            let text = "Neutral";
+            
+            if (score >= 80) { color = "#4ade80"; text = "Extreme Greed"; }
+            else if (score >= 60) { color = "#a3e635"; text = "Greed"; }
+            else if (score >= 40) { color = "#fbbf24"; text = "Neutral"; }
+            else if (score >= 20) { color = "#f97316"; text = "Fear"; }
+            else { color = "#ef4444"; text = "Extreme Fear"; }
+            
+            document.getElementById('sentiment-score').innerText = score + " / 100";
+            document.getElementById('sentiment-score').style.color = color;
+            document.getElementById('sentiment-text').innerText = text;
+            document.getElementById('sentiment-text').style.color = color;
+            document.getElementById('sentiment-summary').innerText = `"${data.summary}"`;
+            
+            const arc = document.getElementById('gauge-arc');
+            arc.style.borderColor = color;
+            arc.style.boxShadow = `0 0 30px ${color}40`;
+            
+            const needle = document.getElementById('gauge-needle');
+            const rotation = (score * 1.8) - 90;
+            needle.style.transform = `translateX(-50%) rotate(${rotation}deg)`;
+        }
+    } catch (e) {
+        console.error("Sentiment fetch failed", e);
+        document.getElementById('sentiment-loading').innerHTML = '<p class="text-danger small">AI Analysis failed to load.</p>';
+    }
+}
+</script>
+{% endblock %}

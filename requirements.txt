@@ -1,0 +1,15 @@
+Flask==3.0.3
+gunicorn==25.1.0
+pandas==2.2.0
+numpy==1.26.4
+yfinance==1.3.0
+scikit-learn==1.3.2
+matplotlib==3.8.0
+openai==1.30.1
+requests==2.31.0
+google-genai==1.73.1
+tenacity==9.1.4
+psycopg2-binary
+python-dotenv
+Flask-SQLAlchemy==3.1.1
+google-generativeai

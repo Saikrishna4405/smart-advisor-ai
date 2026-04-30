@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="animate-fade-in" style="max-width: 900px; margin: auto;">
+
+    <div class="d-flex justify-content-between align-items-center mt-4 mb-4 pb-3 border-bottom" style="border-color: var(--glass-border) !important;">
+        <h2 class="mb-0 text-gradient"><span class="me-2">💼</span> Portfolio / Buys</h2>
+    </div>
+
+    {% if portfolio_data and summary.total_invested > 0 %}
+    <!-- Portfolio Overview Section -->
+    <div class="row g-4 mb-4 animate-fade-in">
+        <!-- Summary Cards -->
+        <div class="col-lg-7">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="glass-card p-4 h-100">
+                        <p class="text-secondary small mb-1">Total Current Value</p>
+                        <h2 class="fw-bold mb-0">₹{{ "{:,.2f}".format(summary.current_market_value) }}</h2>
+                        <div class="mt-2">
+                            <span class="text-secondary small">Invested:</span>
+                            <span class="fw-bold small">₹{{ "{:,.2f}".format(summary.total_invested) }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="glass-card p-4 h-100" style="border-color: {% if summary.total_pnl >= 0 %}rgba(34,197,94,0.3){% else %}rgba(239,68,68,0.3){% endif %};">
+                        <p class="text-secondary small mb-1">Overall Return</p>
+                        <h2 class="fw-bold mb-0 {% if summary.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if summary.total_pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(summary.total_pnl) }}
+                        </h2>
+                        <div class="mt-2">
+                            <span class="{% if summary.total_pnl_percent >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                {% if summary.total_pnl_percent >= 0 %}▲{% else %}▼{% endif %} {{ "{:,.2f}".format(summary.total_pnl_percent|abs) }}%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="glass-card p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Quick Insights</h5>
+                            <span class="badge bg-primary bg-opacity-25 text-primary">Live</span>
+                        </div>
+                        <p class="text-secondary small mb-0">
+                            Your portfolio is mostly concentrated in <strong>{{ summary.sector_labels[0] if summary.sector_labels else 'N/A' }}</strong>. 
+                            Consider diversifying into other sectors to minimize industry-specific risks.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diversification Chart -->
+        <div class="col-lg-5">
+            <div class="glass-card p-4 h-100 text-center">
+                <h5 class="mb-4">Sector Diversification</h5>
+                <div style="max-height: 220px; position: relative;">
+                    <canvas id="sectorChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Portfolio Growth Chart (Step 2) -->
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">📈 Portfolio Growth (Net Worth)</h5>
+                    <span class="text-secondary small">Daily Snapshot</span>
+                </div>
+                <div style="height: 300px; width: 100%;">
+                    <canvas id="growthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not portfolio_data %}
+        <div class="glass-card p-5 text-center mt-5">
+            <h1 class="display-1 opacity-50 mb-3">🛒</h1>
+            <h4 class="text-secondary">Your buy portfolio is empty.</h4>
+            <p class="text-secondary small">Analyze stocks and assign them to your buy list once a decision is formulated.</p>
+            <a href="/analyze" class="btn-premium mt-3 text-decoration-none d-inline-block">Go to Analyze</a>
+        </div>
+    {% else %}
+        <div class="row g-4">
+            {% for item in portfolio_data %}
+                <div class="col-12">
+                    <div class="glass-card d-flex flex-column flex-md-row justify-content-between align-items-center p-4" 
+                         style="border-color: {% if item.status == 'Bought' %}rgba(34,197,94,0.4){% else %}var(--glass-border){% endif %};">
+                        
+                        <!-- Left Info -->
+                        <div class="d-flex align-items-center gap-4 mb-3 mb-md-0 w-100">
+                            <div style="background: {% if item.status == 'Bought' %}rgba(34, 197, 94, 0.2){% else %}rgba(255,255,255,0.05){% endif %}; border-radius: 12px; padding: 15px;">
+                                {% if item.status == 'Bought' %}💰{% else %}⏳{% endif %}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <h4 class="mb-0 fw-bold" style="color: {% if item.status == 'Bought' %}#4ade80{% else %}#fff{% endif %};">{{ item.stock }}</h4>
+                                    <span class="badge rounded-pill" style="background: {% if item.status == 'Bought' %}rgba(34,197,94,0.1); color: #4ade80{% else %}rgba(255,255,255,0.1); color: #ccc{% endif %};">
+                                        {{ item.status }}
+                                    </span>
+                                </div>
+
+                                {% if item.status == 'Bought' %}
+                                    <div class="d-flex gap-4 mt-2">
+                                        <div class="small">
+                                            <span class="text-secondary">Qty:</span> <span class="fw-bold">{{ item.quantity }}</span> 
+                                        </div>
+                                        <div class="small">
+                                            <span class="text-secondary">Avg:</span> <span class="fw-bold">₹{{ "{:,.2f}".format(item.purchase_price) }}</span>
+                                        </div>
+                                        {% if item.live_price %}
+                                        <div class="small">
+                                            <span class="text-secondary">LTP:</span> <span class="fw-bold">₹{{ "{:,.2f}".format(item.live_price) }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <small class="text-secondary">Queued for simulation / future buying</small>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Right Stats / Actions -->
+                        <div class="d-flex align-items-center gap-4">
+                            
+                            {% if item.status == 'Bought' and item.pnl is not none %}
+                            <div class="text-end me-3">
+                                <p class="text-secondary small mb-0">Unrealized P&L</p>
+                                <h4 class="mb-0 fw-bold {% if item.pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="white-space: nowrap;">
+                                    {% if item.pnl >= 0 %}+{% endif %}₹{{ "{:,.2f}".format(item.pnl) }}
+                                </h4>
+                                <small class="{% if item.pnl_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if item.pnl_percent >= 0 %}▲{% else %}▼{% endif %} {{ "{:,.2f}".format(item.pnl_percent|abs) }}%
+                                </small>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="d-flex gap-2">
+                                {% if item.status == 'Queued' %}
+                                    <div class="dropdown">
+                                        <button class="btn btn-premium px-3 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Buy
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-dark glass-card border-0 shadow">
+                                            <li><a class="dropdown-item text-light" href="/go/groww/{{ item.stock }}" target="_blank">🟢 Groww</a></li>
+                                            <li><a class="dropdown-item text-light" href="/go/upstox/{{ item.stock }}" target="_blank">🟣 Upstox</a></li>
+                                            <li><hr class="dropdown-divider border-secondary"></li>
+                                            <li><button class="dropdown-item bg-transparent text-success fw-bold w-100 text-start" data-bs-toggle="modal" data-bs-target="#markBoughtModal-{{ item.stock|replace('.', '-') }}">✅ Log Real Purchase</button></li>
+                                        </ul>
+                                    </div>
+                                {% endif %}
+
+                                <form method="POST" action="/analyze" class="mb-0">
+                                    <input type="hidden" name="stock" value="{{ item.stock }}">
+                                    <button type="submit" class="btn btn-outline-glass px-3" title="Analyze">
+                                        🔍
+                                    </button>
+                                </form>
+                                
+                                <form method="POST" action="/remove_from_buy" class="mb-0">
+                                    <input type="hidden" name="stock" value="{{ item.stock }}">
+                                    <button type="submit" class="btn btn-outline-glass text-danger border-danger px-3 pb-2 pt-2" title="Delete">
+                                        ✖
+                                    </button>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log Purchase Modal -->
+                {% if item.status == 'Queued' %}
+                <div class="modal fade" id="markBoughtModal-{{ item.stock|replace('.', '-') }}" tabindex="-1">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content glass-card" style="background: rgba(10,15,30,0.95); border: 1px solid var(--glass-border);">
+                      <div class="modal-header border-bottom border-dark">
+                        <h5 class="modal-title">Log Real Purchase: {{ item.stock }}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                      </div>
+                      <form action="/mark_bought" method="POST">
+                        <div class="modal-body">
+                            <input type="hidden" name="stock" value="{{ item.stock }}">
+                            <div class="mb-3">
+                                <label class="form-label text-secondary small">Quantity Acquired</label>
+                                <input type="number" name="quantity" class="form-control bg-dark text-light border-secondary" required min="1" placeholder="e.g. 10">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-secondary small">Actual Purchase Price (₹)</label>
+                                <input type="number" step="0.01" name="price" class="form-control bg-dark text-light border-secondary" required min="0.01" placeholder="e.g. 3450.50">
+                            </div>
+                            <p class="small text-secondary mb-0">Record the actual execution details from your broker here to unlock your Real-World Un-Realized P&L!</p>
+                        </div>
+                        <div class="modal-footer border-top border-dark">
+                            <button type="button" class="btn btn-outline-glass border-secondary text-light" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-premium px-4">Log Investment</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+                {% endif %}
+
+
+
+            {% endfor %}
+        </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('sectorChart').getContext('2d');
+    const labels = {{ summary.sector_labels|tojson if summary else '[]' }};
+    const data = {{ summary.sector_values|tojson if summary else '[]' }};
+    
+    if (labels && labels.length > 0) {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#4facfe', '#00f2fe', '#f093fb', '#f5576c', 
+                        '#48c6ef', '#6f86d6', '#fbc2eb', '#a18cd1'
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 15
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#94a3b8',
+                            padding: 20,
+                            usePointStyle: true,
+                            font: { family: "'Outfit', sans-serif", size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(10, 15, 30, 0.9)',
+                        titleFont: { family: "'Outfit', sans-serif", size: 14 },
+                        bodyFont: { family: "'Inter', sans-serif", size: 13 },
+                        padding: 12,
+                        cornerRadius: 10,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                let value = context.parsed || 0;
+                                let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                let percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ₹${value.toLocaleString()} (${percentage}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '75%'
+            }
+        });
+    }
+
+    // --- Growth Chart ---
+    const gCtx = document.getElementById('growthChart').getContext('2d');
+    const gLabels = {{ summary.history_labels|tojson if summary else '[]' }};
+    const gData = {{ summary.history_values|tojson if summary else '[]' }};
+
+    new Chart(gCtx, {
+        type: 'line',
+        data: {
+            labels: gLabels,
+            datasets: [{
+                label: 'Total Value',
+                data: gData,
+                borderColor: '#4facfe',
+                backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#4facfe'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#94a3b8' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8' }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(10, 15, 30, 0.9)',
+                    callbacks: {
+                        label: function(context) {
+                            return `₹${context.parsed.y.toLocaleString()}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

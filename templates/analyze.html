@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- ===== INPUT FORM HEADER ===== -->
+<div class="glass-card p-4 mt-4 animate-fade-in" style="max-width: 900px; margin: auto;">
+
+    <div class="text-center mb-4">
+        <h2 class="mb-1 text-gradient">Stock AI Report</h2>
+        <p class="text-secondary small">Smart checks for price drops and future growth.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger bg-danger bg-opacity-10 border-danger text-danger text-center mb-4 rounded-4 animate-fade-in"
+        role="alert" style="border-style: dashed !important;">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-3">
+
+        <div class="position-relative w-100" style="max-width: 300px;">
+            <input list="stockOptions" name="stock" class="form-control text-center fs-5" aria-label="Search"
+                placeholder="Enter stock name (e.g. TCS)..." value="{{ stock_symbol or '' }}">
+            <datalist id="stockOptions">
+                {% for s in stocks %}
+                <option value="{{ s }}"></option>
+                {% endfor %}
+            </datalist>
+        </div>
+
+        <select name="range" class="form-select fs-5 text-center w-100" style="max-width: 200px;">
+            <option value="15D" {% if selected_range=='15D' %}selected{% endif %}>15 Days</option>
+            <option value="1M" {% if selected_range=='1M' %}selected{% endif %}>1 Month</option>
+            <option value="6M" {% if selected_range=='6M' %}selected{% endif %}>6 Months</option>
+            <option value="1Y" {% if selected_range=='1Y' %}selected{% endif %}>1 Year</option>
+            <option value="3Y" {% if selected_range=='3Y' %}selected{% endif %}>3 Years</option>
+            <option value="5Y" {% if selected_range=='5Y' %}selected{% endif %}>5 Years</option>
+            <option value="10Y" {% if selected_range=='10Y' %}selected{% endif %}>10 Years</option>
+        </select>
+
+        <button class="btn-premium px-5 w-100 fs-5" style="max-width: 200px;">
+            Analyze
+        </button>
+
+    </form>
+</div>
+
+<div class="animate-fade-in mt-5">
+
+    {% if not stock_symbol %}
+    <div class="text-center py-5 opacity-25">
+        <h4 class="fw-light mt-5">Search for a stock to generate an AI analysis report.</h4>
+    </div>
+    {% else %}
+    <!-- Analysis Content and Bento Boxes go here -->
+
+    <!-- ===== BENTO BOX TOP GRID ===== -->
+    <div class="row g-4" style="max-width: 1200px; margin: auto;">
+
+        <!-- Hero Price Box -->
+        <div class="col-md-6 col-lg-5">
+            <div class="glass-card h-100 p-4 d-flex flex-column justify-content-center text-center">
+
+                <h1 class="display-4 fw-bold text-gradient mb-0">{{ stock_symbol }}</h1>
+                <p class="text-secondary small mb-4">{{ stock_name }}</p>
+
+                {% if live_price %}
+                {% set is_positive = price_change >= 0 %}
+                <p class="text-secondary small text-uppercase tracking-wide mb-1">Live Market Price</p>
+                <h2 class="fw-bold fs-1 mb-0
+                        {% if is_positive %} text-success
+                        {% else %} text-danger
+                        {% endif %}"
+                    style="text-shadow: 0 0 15px {% if is_positive %}rgba(34,197,94,0.4){% else %}rgba(239,68,68,0.4){% endif %};">
+                    {% if live_price %}
+                    ₹{{ "{:,.2f}".format(live_price) }}
+                    {% else %}
+                    ₹ --
+                    {% endif %}
+                </h2>
+
+                <p class="fs-5 fw-bold mb-0 {% if is_positive %} text-success {% else %} text-danger {% endif %}">
+                    {% if is_positive %}↑ +{{ change_percent }}%{% else %}↓ {{ change_percent }}%{% endif %}
+                </p>
+                {% else %}
+                <p class="text-secondary mb-1">Last Close</p>
+                <h2 class="fs-1">
+                    {% if prices and prices|length > 0 %}
+                    ₹ {{ "{:,.2f}".format(prices[-1]) }}
+                    {% else %}
+                    ₹ --
+                    {% endif %}
+                </h2>
+                {% endif %}
+
+            </div>
+        </div>
+
+        <!-- AI Core Recommendation Box -->
+        <div class="col-md-6 col-lg-7">
+            <div id="ai-recommendation-box"
+                class="glass-card h-100 p-4 d-flex flex-column align-items-center justify-content-center text-center position-relative overflow-hidden">
+                <div id="ai-loading-spinner" class="py-5">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <h5 class="text-secondary">AI Analyzing Indicators...</h5>
+                </div>
+
+                <div id="ai-content" style="display:none; width:100%;">
+                    <h5 class="text-secondary text-uppercase mb-2">AI Recommendation</h5>
+                    <h1 class="display-3 fw-bold mb-3" id="rec-text">--</h1>
+
+                    <div class="d-flex align-items-center justify-content-center gap-3 w-100">
+                        <div style="flex: 1; max-width: 150px;">
+                            <div class="d-flex justify-content-between small text-secondary mb-1">
+                                <span>Confidence</span>
+                                <span id="conf-val">--%</span>
+                            </div>
+                            <div class="progress bg-transparent border"
+                                style="height: 6px; border-color: var(--glass-border) !important;">
+                                <div id="conf-bar" class="progress-bar"
+                                    style="width: 0%; background: var(--accent-cyan);"></div>
+                            </div>
+                        </div>
+
+                        <div style="flex: 1; max-width: 150px;">
+                            <div class="d-flex justify-content-between small text-secondary mb-1">
+                                <span>Quality Score</span>
+                                <span id="score-val">--/10</span>
+                            </div>
+                            <div class="progress bg-transparent border"
+                                style="height: 6px; border-color: var(--glass-border) !important;">
+                                <div id="score-bar" class="progress-bar"
+                                    style="width: 0%; background: var(--accent-purple);"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ACTIONS TRAY -->
+    <div class="d-flex justify-content-center gap-3 mt-4" style="max-width: 1200px; margin: auto;">
+        <form id="buyForm" class="mb-0">
+            <input type="hidden" name="stock" value="{{ stock_symbol }}">
+            <button type="button" onclick="addToBuy()" id="buyBtn"
+                class="btn btn-outline-glass px-5 rounded-pill d-flex align-items-center justify-content-center"
+                style="min-width: 200px; border-color: rgba(34,197,94,0.4); color: #4ade80;">
+                🟢 Buy Now
+            </button>
+        </form>
+
+        <form id="wishlistForm" class="mb-0">
+            <input type="hidden" name="stock" value="{{ stock_symbol }}">
+            <button type="button" onclick="addToWishlist()" id="wishlistBtn"
+                class="btn btn-outline-glass px-5 rounded-pill d-flex align-items-center justify-content-center"
+                style="min-width: 200px; border-color: rgba(234,179,8,0.4); color: #facc15;">
+                ⭐ Watchlist
+            </button>
+        </form>
+
+        <div class="dropdown">
+            <button class="btn btn-premium rounded-pill px-4 dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                style="padding-top: 10px; padding-bottom: 10px;">
+                Trade Broker
+            </button>
+            <ul class="dropdown-menu shadow"
+                style="background: rgba(10, 15, 30, 0.95); backdrop-filter: blur(16px); border: 1px solid var(--glass-border); border-radius: 12px;">
+                <li><a class="dropdown-item text-light d-flex align-items-center mb-1"
+                        href="/go/groww/{{ stock_symbol }}" target="_blank">🟢 Groww</a></li>
+                <li><a class="dropdown-item text-light d-flex align-items-center" href="/go/upstox/{{ stock_symbol }}"
+                        target="_blank">🟣 Upstox</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- EXPLANATION & FORECAST BENTO -->
+    <div class="row g-4 mt-2" style="max-width: 1200px; margin: auto;">
+
+        <div class="col-md-7">
+            <div class="glass-card p-4 h-100">
+                <h5 class="text-secondary mb-3">
+                    <span class="fs-4 me-2 bg-dark rounded-circle px-2">✨</span>
+                    Executive Summary
+                </h5>
+                <div id="ai-explanation-loading">
+                    <div class="placeholder-glow">
+                        <span class="placeholder col-12 bg-secondary"
+                            style="height: 100px; opacity: 0.1; border-radius: 8px;"></span>
+                    </div>
+                </div>
+                <p id="ai-explanation-text" class="fs-5 fw-light"
+                    style="line-height: 1.6; color: #e2e8f0; display:none;"></p>
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="glass-card p-4 h-100 text-center d-flex flex-column justify-content-center">
+                <h5 class="text-secondary mb-2 border-bottom pb-2"
+                    style="border-color: var(--glass-border) !important;">
+                    AI Price Prediction (5 Days)
+                </h5>
+
+                <div id="forecast-loading" class="py-4">
+                    <div class="spinner-grow text-primary" role="status"></div>
+                </div>
+
+                <div id="forecast-content" style="display:none;">
+                    <h2 id="pred-price" class="display-5 fw-bold mt-3 mb-1">₹ --</h2>
+                    <h4 id="pred-direction" class="mb-4">--</h4>
+                </div>
+
+                <small class="text-secondary opacity-50 fst-italic mt-auto pt-2" style="font-size: 0.75rem;">
+                    * AI calculations do not guarantee future returns. Check all details.
+                </small>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- METRICS GRID -->
+    <div class="row g-4 mt-2" style="max-width: 1200px; margin: auto;">
+        <div class="col-md-2 col-6">
+            <div class="glass-card p-3 text-center h-100 shadow-sm">
+                <p class="text-secondary small text-uppercase mb-1">Volatility</p>
+                <h4 class="mb-0 fw-bold">{{ metrics.volatility }}%</h4>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="glass-card p-3 text-center h-100 shadow-sm">
+                <p class="text-secondary small text-uppercase mb-1">Trend</p>
+                <h4 class="mb-0 fw-bold">{{ metrics.trend }}</h4>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="glass-card p-3 text-center h-100 shadow-sm">
+                <p class="text-secondary small text-uppercase mb-1">Sharpe</p>
+                <h4 class="mb-0 fw-bold">{{ metrics.sharpe }}</h4>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="glass-card p-3 text-center h-100 shadow-sm">
+                <p class="text-secondary small text-uppercase mb-1">RSI</p>
+                <h4 class="mb-0 fw-bold">{{ metrics.rsi }}</h4>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="glass-card p-3 text-center h-100 shadow-sm">
+                <p class="text-secondary small text-uppercase mb-1">Avg Return</p>
+                <h4 class="mb-0 fw-bold">{{ metrics.avg_return }}%</h4>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="glass-card p-3 text-center h-100 shadow-sm">
+                <p class="text-secondary small text-uppercase mb-1">Risk Scale</p>
+                <h4 id="risk-scale-text" class="mb-0 fw-bold px-2 rounded-pill 
+                    {% if metrics.risk_level == 'Low' %} text-success bg-success bg-opacity-10
+                    {% elif metrics.risk_level == 'Moderate' %} text-warning bg-warning bg-opacity-10
+                    {% else %} text-danger bg-danger bg-opacity-10
+                    {% endif %}">{{ metrics.risk_level or 'Low' }}</h4>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- IMMERSIVE CHARTS -->
+    <div class="row g-4 mt-2 mb-5" style="max-width: 1200px; margin: auto;">
+
+        <div class="col-lg-8">
+            <div class="glass-card p-4 h-100">
+                <h5 class="text-secondary mb-3 text-uppercase">Price Performance History</h5>
+                <div style="position: relative; height:400px;">
+                    <canvas id="stockChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="glass-card p-4 h-100">
+                <h5 class="text-secondary mb-3 text-uppercase">Monthly Seasonality (%)</h5>
+                <div style="position: relative; height:400px;" id="monthly-container">
+                    <canvas id="monthlyChart"></canvas>
+                    <div id="monthly-loading" class="position-absolute top-50 start-50 translate-middle">
+                        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div>
+
+<script>
+    const stockSymbol = "{{ stock_symbol }}";
+    const dates = {{ dates | tojson }};
+    const prices = {{ prices | tojson }};
+    const ma20 = {{ metrics.ma20 | tojson }};
+    const ma50 = {{ metrics.ma50 | tojson }};
+
+    // --- Initial Charts ---
+    const ctx = document.getElementById("stockChart").getContext("2d");
+    new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: dates,
+            datasets: [{
+                label: "Close Price",
+                data: prices,
+                borderColor: "rgba(0, 242, 254, 1)",
+                backgroundColor: 'rgba(0, 242, 254, 0.1)',
+                fill: true,
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { grid: { display: false }, ticks: { color: "#94a3b8" } },
+                y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8" } }
+            }
+        }
+    });
+
+    // --- Deep Analysis Async ---
+    async function fetchDeepAnalysis() {
+        const formData = new FormData();
+        formData.append('stock', stockSymbol);
+
+        try {
+            const response = await fetch('/api/analyze_deep', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.prediction && data.prediction.recommendation !== "Engine Error") {
+                // Recommendation Box
+                document.getElementById('ai-loading-spinner').style.display = 'none';
+                document.getElementById('ai-content').style.display = 'block';
+
+                const rec = data.prediction.recommendation;
+                const recEl = document.getElementById('rec-text');
+                recEl.innerText = rec;
+                if (rec.includes("Buy")) recEl.style.color = "#4ade80";
+                else if (rec.includes("Sell")) recEl.style.color = "#f87171";
+                else recEl.style.color = "#facc15";
+
+                document.getElementById('conf-val').innerText = data.prediction.confidence + "%";
+                document.getElementById('conf-bar').style.width = data.prediction.confidence + "%";
+                document.getElementById('score-val').innerText = data.prediction.score + "/10";
+                document.getElementById('score-bar').style.width = (data.prediction.score * 10) + "%";
+
+                // Update Risk Scale
+                const rText = document.getElementById('risk-scale-text');
+                if (rText) {
+                    const rLevel = data.prediction.risk_level;
+                    rText.innerText = rLevel;
+                    rText.className = "mb-0 fw-bold px-2 rounded-pill";
+                    if (rLevel === "Low") rText.classList.add("text-success", "bg-success", "bg-opacity-10");
+                    else if (rLevel === "Moderate") rText.classList.add("text-warning", "bg-warning", "bg-opacity-10");
+                    else rText.classList.add("text-danger", "bg-danger", "bg-opacity-10");
+                }
+
+                // Explanation
+                document.getElementById('ai-explanation-loading').style.display = 'none';
+                const expText = document.getElementById('ai-explanation-text');
+                expText.innerText = data.ai_explanation;
+                expText.style.display = 'block';
+
+                // Forecast
+                document.getElementById('forecast-loading').style.display = 'none';
+                document.getElementById('forecast-content').style.display = 'block';
+                document.getElementById('pred-price').innerText = "₹" + data.prediction.pred_price.toLocaleString();
+                const dir = document.getElementById('pred-direction');
+                dir.innerText = data.prediction.pred_direction === 'Rise' ? '📈 Projected Rise' : '📉 Projected Fall';
+                dir.className = data.prediction.pred_direction === 'Rise' ? 'text-success' : 'text-danger';
+
+                // Monthly Chart
+                document.getElementById('monthly-loading').style.display = 'none';
+                renderMonthlyChart(data.monthly_values);
+            } else {
+                throw new Error(data.error || "Analysis Engine Unavailable");
+            }
+        } catch (e) {
+            console.error("Deep analysis failed", e);
+            document.getElementById('ai-loading-spinner').innerHTML = `
+            <i class="bi bi-info-circle text-info fs-1 mb-2"></i>
+            <h5 class="text-info">Deep Engine Active</h5>
+            <p class="text-secondary small">Local technical diagnostic is providing results. Neural summary restricted.</p>
+        `;
+            document.getElementById('ai-explanation-loading').innerHTML = `
+            <div class="alert alert-info bg-info bg-opacity-10 border-info text-info rounded-4 small py-2">
+                Local analysis summary attached below.
+            </div>
+        `;
+            document.getElementById('forecast-loading').innerHTML = `
+            <p class="text-secondary small">Projection unavailable</p>
+        `;
+            document.getElementById('monthly-loading').innerHTML = `
+            <p class="text-secondary small">Seasonality unavailable</p>
+        `;
+        }
+    }
+
+    function renderMonthlyChart(vals) {
+        const mCtx = document.getElementById("monthlyChart").getContext("2d");
+        new Chart(mCtx, {
+            type: "bar",
+            data: {
+                labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+                datasets: [{
+                    data: vals,
+                    backgroundColor: vals.map(v => v >= 0 ? 'rgba(74, 222, 128, 0.4)' : 'rgba(248, 113, 113, 0.4)'),
+                    borderColor: vals.map(v => v >= 0 ? '#4ade80' : '#f87171'),
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { color: 'rgba(255,255,255,0.4)' } },
+                    y: { ticks: { color: 'rgba(255,255,255,0.4)' } }
+                }
+            }
+        });
+    }
+
+    function addToBuy() {
+        fetch("/add_to_buy", {
+            method: "POST",
+            body: new FormData(document.getElementById("buyForm"))
+        }).then(() => {
+            let btn = document.getElementById("buyBtn");
+            btn.innerHTML = "Queued ✅";
+            btn.style.background = "rgba(34, 197, 94, 0.2)";
+            btn.disabled = true;
+        });
+    }
+
+    function addToWishlist() {
+        fetch("/add_to_watchlist", {
+            method: "POST",
+            body: new FormData(document.getElementById("wishlistForm"))
+        }).then(() => {
+            let btn = document.getElementById("wishlistBtn");
+            btn.innerHTML = "Starred ⭐";
+            btn.style.background = "rgba(234, 179, 8, 0.2)";
+            btn.disabled = true;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', fetchDeepAnalysis);
+</script>
+
+{% endblock %}

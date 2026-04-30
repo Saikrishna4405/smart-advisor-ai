@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="text-center mt-2 mb-5">
+        <h1 class="display-5 text-gradient mb-2">Market Scanner</h1>
+        <p class="text-secondary">Real-time AI stock checks. Watching 24 top stocks.</p>
+    </div>
+
+    <!-- Filters and Sorting -->
+    <div class="glass-card p-3 mb-5 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex gap-2" id="scanned-count">
+            <span class="badge bg-primary bg-opacity-25 text-primary p-2 px-3">🚀 Initializing Scanner...</span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="small text-secondary" id="loading-spinner">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                Analyzing...
+            </span>
+            <label class="small text-secondary">Sort:</label>
+            <select id="sort-order" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: 150px;" onchange="sortCards()">
+                <option value="score">AI Score (High)</option>
+                <option value="rsi">RSI (Low)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Scanner Grid -->
+    <div id="scanner-grid" class="row g-4 mb-5">
+        <!-- Cards will be injected here via JS -->
+    </div>
+
+    <!-- Pro Tip -->
+    <div class="glass-card p-4 text-center" style="border-left: 4px solid var(--accent-cyan);">
+        <p class="small text-secondary mb-0">
+            <span class="text-info fw-bold me-2">💡 Pro Tip:</span>
+            Look for stocks with an <strong>AI Score > 7.5</strong> and <strong>RSI < 40</strong>. These represent high-probability trend reversal opportunities.
+        </p>
+    </div>
+</div>
+
+<script>
+const symbols = {{ symbols | tojson }};
+const grid = document.getElementById('scanner-grid');
+const scannedCountBadge = document.getElementById('scanned-count');
+const loadingSpinner = document.getElementById('loading-spinner');
+let scannedData = [];
+
+async function scanAll() {
+    let completed = 0;
+    scannedCountBadge.innerHTML = `<span class="badge bg-primary bg-opacity-25 text-primary p-2 px-3">Wait... Scanning 0/${symbols.length}</span>`;
+
+    for (const symbol of symbols) {
+        const formData = new FormData();
+        formData.append('symbol', symbol);
+
+        try {
+            const response = await fetch('/api/scan_stock', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (!data.error) {
+                scannedData.push(data);
+                addCard(data);
+                sortCards();
+            }
+        } catch (e) {
+            console.error("Scan failed for", symbol, e);
+        }
+
+        completed++;
+        scannedCountBadge.innerHTML = `<span class="badge bg-success bg-opacity-25 text-success p-2 px-3">Scanning: ${completed}/${symbols.length} Stocks Done</span>`;
+    }
+    
+    loadingSpinner.style.display = 'none';
+    scannedCountBadge.innerHTML = `<span class="badge bg-success bg-opacity-10 text-success p-2 px-3">Scan Complete: ${symbols.length} Stocks Analyzed</span>`;
+}
+
+function addCard(stock) {
+    const col = document.createElement('div');
+    col.className = 'col-md-6 col-lg-4 stock-card-col';
+    col.setAttribute('data-score', stock.score);
+    col.setAttribute('data-rsi', stock.rsi);
+    
+    const scoreClass = stock.score >= 7.5 ? 'success' : (stock.score >= 5.5 ? 'primary' : (stock.score >= 4.5 ? 'secondary' : 'danger'));
+    const scoreTextColor = stock.score >= 7.5 ? 'success' : (stock.score >= 5.5 ? 'primary' : (stock.score >= 4.5 ? 'white' : 'danger'));
+    
+    col.innerHTML = `
+        <div class="glass-card p-4 glass-card-hover h-100 d-flex flex-column animate-fade-in">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h4 class="mb-0 fw-bold">${stock.symbol}</h4>
+                    <small class="text-secondary">${stock.name}</small>
+                </div>
+                <div class="text-end">
+                    <div class="badge bg-${scoreClass} bg-opacity-25 text-${scoreTextColor} px-3 py-2 border border-white border-opacity-10">
+                        Score: ${stock.score}/10
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-auto">
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="p-2 rounded bg-white bg-opacity-5 text-center">
+                            <small class="text-secondary d-block">RSI</small>
+                            <span class="fw-bold ${stock.rsi < 35 ? 'text-success' : (stock.rsi > 70 ? 'text-danger' : 'text-white')}">
+                                ${stock.rsi.toFixed(1)}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded bg-white bg-opacity-5 text-center">
+                            <small class="text-secondary d-block">Trend</small>
+                            <span class="fw-bold ${stock.trend === 'Uptrend' ? 'text-success' : 'text-danger'}">
+                                ${stock.trend === 'Uptrend' ? '▲ Up' : '▼ Down'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="/analyze" class="mb-0">
+                    <input type="hidden" name="stock" value="${stock.symbol}">
+                    <button type="submit" class="btn btn-outline-glass w-100 py-2">
+                        AI Details
+                    </button>
+                </form>
+            </div>
+        </div>
+    `;
+    grid.appendChild(col);
+}
+
+function sortCards() {
+    const order = document.getElementById('sort-order').value;
+    const cards = Array.from(grid.querySelectorAll('.stock-card-col'));
+
+    cards.sort((a, b) => {
+        if (order === 'score') {
+            return parseFloat(b.getAttribute('data-score')) - parseFloat(a.getAttribute('data-score'));
+        } else if (order === 'rsi') {
+            return parseFloat(a.getAttribute('data-rsi')) - parseFloat(b.getAttribute('data-rsi'));
+        }
+        return 0;
+    });
+
+    cards.forEach(card => grid.appendChild(card));
+}
+
+// Start once DOM is ready
+document.addEventListener('DOMContentLoaded', scanAll);
+</script>
+{% endblock %}
